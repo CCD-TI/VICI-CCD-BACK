@@ -234,20 +234,73 @@ export class HistorialController {
         return { icon: "pi", statusname: "DESCONOCIDO" };
     }
   };
-  repeticiones = async (req : any, res: any) => {
-    const { phone_number, userId } = req.query;
+  
+  repeticiones = async (req: any, res: any) => {
+  const { phone_number} = req.query;
+
+  try {
+    const [rows] = await db.query<any[]>(`
+      SELECT 
+        vlead.comments, 
+        vlead.modify_date,
+        vlead.first_name, 
+        vlead.last_name,
+        vlead.address1,
+        vlead.address2,
+        vlead.address3,
+        vlead.city,
+        vlead.province,
+        vlead.phone_number,
+        vlead.email,
+        vlead.postal_code,
+        COALESCE(vstatus_camp.status_name, vstatus_sys.status_name, vlead.status) AS status_display,
+        vuser.full_name AS user_full_name
+      FROM vicidial_list AS vlead
+      LEFT JOIN vicidial_campaign_statuses AS vstatus_camp 
+        ON vstatus_camp.status = vlead.status
+      LEFT JOIN vicidial_statuses AS vstatus_sys 
+        ON vstatus_sys.status = vlead.status
+      LEFT JOIN vicidial_users AS vuser 
+        ON vuser.user = vlead.user
+      WHERE vlead.phone_number = ?
+      GROUP BY vlead.modify_date;
+    `, [phone_number]);
+
+    res.json(rows); // Devolvemos todas las columnas seleccionadas
+  } catch (error) {
+    console.error("Error al obtener repeticiones:", error);
+    res.status(500).json({ error: "Error interno al obtener repeticiones" });
+  }
+};
+
+
+  deleteById = async (req: any, res: any) => {
+    const { userId, leadId } = req.params;
+
     try {
-      const [rows] = await db.query<any[]>(
-        `SELECT vlead.comments, vlead.modify_date
-        FROM vicidial_list as vlead
-        WHERE vlead.phone_number = ? AND vlead.user = ?
-        GROUP BY vlead.modify_date;`,
-        [phone_number, userId]
+      const [rows] = await db.query(
+        `SELECT * FROM vicidial_list WHERE user = ? AND lead_id = ?`,
+        [userId, leadId]
       );
-      res.json(rows);
+
+      if (Array.isArray(rows) && rows.length === 0) {
+        return res.status(404).json({ message: "Registro no encontrado" });
+      }
+
+      const [result] = await db.query(
+        `DELETE FROM vicidial_list WHERE user = ? AND lead_id = ?`,
+        [userId, leadId]
+      );
+
+      if ((result as any).affectedRows === 0) {
+        return res.status(404).json({ message: "No se pudo eliminar el registro" });
+      }
+
+      res.json({ message: "Registro eliminado correctamente" });
     } catch (error) {
-      console.error("Error al obtener leads:", error);
-      res.status(500).json({ error: "Error al obtener leads" });
+      console.error("Error al eliminar el registro:", error);
+      res.status(500).json({ error: "Error interno al eliminar el registro" });
     }
-  } 
+  };
+
 }

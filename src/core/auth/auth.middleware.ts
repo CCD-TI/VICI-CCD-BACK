@@ -3,20 +3,20 @@ import jwt from 'jsonwebtoken';
 import { JWT_SECRET } from '../../config/index';
 
 export interface AuthRequest extends Request {
-  user?: any;
+  user?: any; 
 }
 
 export const verifyToken = (req: AuthRequest, res: Response, next: NextFunction): void => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-  console.log(token); 
+
   if (!token) {
     res.status(403).json({ message: 'Token requerido' });
     return;
   }
-  console.log(JWT_SECRET);
+
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET) as { user: string; user_level: number };
     req.user = decoded;
     next();
   } catch (err) {
@@ -24,13 +24,17 @@ export const verifyToken = (req: AuthRequest, res: Response, next: NextFunction)
   }
 };
 
-export const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
+// acceso solo a administradores
+export const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction): void => {
   if (!req.user) {
-    return res.status(401).json({ message: 'Usuario no autenticado' });
+    res.status(401).json({ message: 'Usuario no autenticado' });
+    return;
   }
 
+  // privilegios de administrador(user_level >= 9)
   if (req.user.user_level < 9) {
-    return res.status(403).json({ message: 'Acceso restringido a administradores' });
+    res.status(403).json({ message: 'Acceso restringido a administradores' });
+    return;
   }
 
   next();
