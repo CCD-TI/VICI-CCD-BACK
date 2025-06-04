@@ -1,1 +1,1 @@
-export const JWT_SECRET = 'tu_clave_secreta_segura';
+export const JWT_SECRET = 'Sh4tyelamigodelosniños734634##W4325%63nhgnhgv';
