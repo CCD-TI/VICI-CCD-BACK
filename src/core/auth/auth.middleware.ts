@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { JWT_SECRET } from '../../config';
+import { JWT_SECRET } from '../../config/index';
 
 export interface AuthRequest extends Request {
   user?: any;
@@ -9,12 +9,12 @@ export interface AuthRequest extends Request {
 export const verifyToken = (req: AuthRequest, res: Response, next: NextFunction): void => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-
+  console.log(token); 
   if (!token) {
     res.status(403).json({ message: 'Token requerido' });
     return;
   }
-
+  console.log(JWT_SECRET);
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;

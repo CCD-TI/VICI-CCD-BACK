@@ -27,7 +27,7 @@ export class AuthController {
           res.status(401).json({ message: 'Contraseña incorrecta' });
           return;
         }
-    
+        console.log(JWT_SECRET)
         const token = jwt.sign(
           {
             user: String(userData.user),
