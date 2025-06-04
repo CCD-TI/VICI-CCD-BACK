@@ -2,6 +2,7 @@ import express, { Application, Request, Response, NextFunction } from "express";
 import cors from "cors";
 import GestionHistorialRouter from "./routes/gestion_historial.routes";
 import AuthRouter from "./routes/auth.routes";
+import HistorialUserslRouter from "./routes/historial_users.routes";
 
 class App {
   private server: Application;
@@ -31,6 +32,7 @@ class App {
     // Rutas de la API
     this.server.use("/api/gestion_historial", GestionHistorialRouter);
     this.server.use("/api/auth", AuthRouter);
+    this.server.use("/api/usuario_historial", HistorialUserslRouter)
 
     // Ruta de prueba
     this.server.get("/health", (req: Request, res: Response) => {
