@@ -1,23 +1,24 @@
-import express from 'express';
-import cors from 'cors';
-import leadsRoutes from './routes/gestion_historial.routes';
-import authRoutes from './routes/auth.routes';
+import { config } from "dotenv";
+config();
+import app from "./app";
+import { createServer } from "http";
 
-const app = express();
-const PORT = 3000;
+async function main(): Promise<void> {
+  try {
 
-const corsOptions = {
-  origin: 'http://localhost:4200',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  credentials: true
-};
-
-app.use(cors(corsOptions));
-app.use(express.json());
-
-app.use('/api/gestion_historial', leadsRoutes);
-app.use('/api/auth', authRoutes);
-
-app.listen(PORT, () => {
-  console.log(`Servidor escuchando en http://localhost:${PORT}`);
-});
+    // Inicialización del servidor
+    const httpServer = createServer(app);
+    
+    //escucha del servidor en puerto 8001
+    const port = Number(process.env.PORT || 3000);
+    
+    httpServer.listen(port, '0.0.0.0', () => {
+      console.log(`Server is running on http://localhost:${port}`);
+    });
+    
+  } catch (error) {
+    console.error("Error during application initialization:", error);
+    process.exit(1); // Salir del proceso si ocurre un error crítico
+  }
+}
+main();
