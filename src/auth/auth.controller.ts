@@ -19,7 +19,6 @@ export const login: RequestHandler = async (req, res): Promise<void> => {
 
     const userData = rows[0];
 
-    // Comparación directa de texto plano
     const inputPassword = String(password);
     const dbPassword = String(userData.pass);
 
@@ -28,7 +27,6 @@ export const login: RequestHandler = async (req, res): Promise<void> => {
       return;
     }
 
-    // Generación del token
     const token = jwt.sign(
       {
         user: String(userData.user),
