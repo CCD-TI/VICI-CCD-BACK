@@ -252,7 +252,7 @@ export class HistorialController {
     }
   } 
   
-  repeticionesglobal = async (req: any, res: any) => {
+repeticionesglobal = async (req: any, res: any) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -262,15 +262,20 @@ export class HistorialController {
 
     let query = `
       SELECT
-        list_id,
-        lead_id,
-        phone_number,
-        first_name,
-        last_name,
-        comments,
-        modify_date
-      FROM vicidial_list
-      WHERE phone_number IN (
+        vlead.list_id,
+        vlead.lead_id,
+        vcampaign.campaign_name,
+        vlead.user as usuario,
+        vlead.phone_number,
+        vlead.address3,
+        vlead.last_name,
+        vlead.modify_date,
+        vlead.comments as comentario,
+        vlead.modify_date
+      FROM vicidial_list AS vlead
+      INNER JOIN vicidial_lists AS vlist ON vlead.list_id = vlist.list_id
+      INNER JOIN vicidial_campaigns AS vcampaign ON vcampaign.campaign_id = vlist.campaign_id
+      WHERE vlead.phone_number IN (
         SELECT phone_number
         FROM vicidial_list
         GROUP BY phone_number
@@ -278,8 +283,9 @@ export class HistorialController {
       )
     `;
 
+    // Especifica el prefijo de la tabla para la columna `list_id` en la cláusula WHERE
     if (list_id) {
-      query += ` AND list_id = ? `;
+      query += ` AND vlead.list_id = ? `;
     }
 
     query += `
@@ -292,8 +298,8 @@ export class HistorialController {
 
     let countQuery = `
       SELECT COUNT(*) AS total
-      FROM vicidial_list
-      WHERE phone_number IN (
+      FROM vicidial_list AS vlead
+      WHERE vlead.phone_number IN (
         SELECT phone_number
         FROM vicidial_list
         GROUP BY phone_number
@@ -302,7 +308,7 @@ export class HistorialController {
     `;
 
     if (list_id) {
-      countQuery += ` AND list_id = ? `;
+      countQuery += ` AND vlead.list_id = ? `;
     }
 
     const [countResult] = await db.query<any[]>(countQuery, list_id ? [list_id] : []);
@@ -319,6 +325,7 @@ export class HistorialController {
     res.status(500).json({ error: "Error al obtener repeticiones" });
   }
 };
+
 
 
 
