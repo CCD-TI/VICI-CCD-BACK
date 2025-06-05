@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-export const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+export const JWT_SECRET = process.env.JWT_SECRET || 'Sh4tyelamigodelosniños734634##W4325%63nhgnhgv';
 export const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
 
 // Configuración de la base de datos
