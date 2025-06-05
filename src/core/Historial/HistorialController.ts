@@ -234,13 +234,31 @@ export class HistorialController {
         return { icon: "pi", statusname: "DESCONOCIDO" };
     }
   };
+
+  repeticiones = async (req : any, res: any) => {
+    const { phone_number, userId } = req.query;
+    try {
+      const [rows] = await db.query<any[]>(
+        `SELECT vlead.comments, vlead.modify_date
+        FROM vicidial_list as vlead
+        WHERE vlead.phone_number = ? AND vlead.user = ?
+        GROUP BY vlead.modify_date;`,
+        [phone_number, userId]
+      );
+      res.json(rows);
+    } catch (error) {
+      console.error("Error al obtener leads:", error);
+      res.status(500).json({ error: "Error al obtener leads" });
+    }
+  } 
   
-  repeticiones = async (req: any, res: any) => {
+  repeticionesglobal = async (req: any, res: any) => {
   const { phone_number} = req.query;
 
   try {
     const [rows] = await db.query<any[]>(`
       SELECT 
+        vlead.lead_id,
         vlead.comments, 
         vlead.modify_date,
         vlead.first_name, 
@@ -248,11 +266,8 @@ export class HistorialController {
         vlead.address1,
         vlead.address2,
         vlead.address3,
-        vlead.city,
-        vlead.province,
         vlead.phone_number,
         vlead.email,
-        vlead.postal_code,
         COALESCE(vstatus_camp.status_name, vstatus_sys.status_name, vlead.status) AS status_display,
         vuser.full_name AS user_full_name
       FROM vicidial_list AS vlead
