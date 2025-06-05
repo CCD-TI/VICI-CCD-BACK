@@ -252,82 +252,78 @@ export class HistorialController {
     }
   } 
   
-repeticionesglobal = async (req: any, res: any) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const offset = (page - 1) * limit;
+  repeticionesglobal = async (req: any, res: any) => {
+    try {
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 10;
+      const offset = (page - 1) * limit;
 
-    const list_id = req.query.list_id;
+      const list_id = req.query.list_id;
 
-    let query = `
-      SELECT
-        vlead.list_id,
-        vlead.lead_id,
-        vcampaign.campaign_name,
-        vlead.user as usuario,
-        vlead.phone_number,
-        vlead.address3,
-        vlead.last_name,
-        vlead.modify_date,
-        vlead.comments as comentario,
-        vlead.modify_date
-      FROM vicidial_list AS vlead
-      INNER JOIN vicidial_lists AS vlist ON vlead.list_id = vlist.list_id
-      INNER JOIN vicidial_campaigns AS vcampaign ON vcampaign.campaign_id = vlist.campaign_id
-      WHERE vlead.phone_number IN (
-        SELECT phone_number
-        FROM vicidial_list
-        GROUP BY phone_number
-        HAVING COUNT(*) > 1
-      )
-    `;
+      let query = `
+        SELECT
+          vlead.list_id,
+          vlead.lead_id,
+          vcampaign.campaign_name,
+          vlead.user as usuario,
+          vlead.phone_number,
+          vlead.address3,
+          vlead.last_name,
+          vlead.modify_date,
+          vlead.comments as comentario,
+          vlead.modify_date
+        FROM vicidial_list AS vlead
+        INNER JOIN vicidial_lists AS vlist ON vlead.list_id = vlist.list_id
+        INNER JOIN vicidial_campaigns AS vcampaign ON vcampaign.campaign_id = vlist.campaign_id
+        WHERE vlead.phone_number IN (
+          SELECT phone_number
+          FROM vicidial_list
+          GROUP BY phone_number
+          HAVING COUNT(*) > 1
+        )
+      `;
 
-    // Especifica el prefijo de la tabla para la columna `list_id` en la cláusula WHERE
-    if (list_id) {
-      query += ` AND vlead.list_id = ? `;
+      if (list_id) {
+        query += ` AND vlead.list_id = ? `;
+      }
+
+      query += `
+        ORDER BY phone_number, modify_date DESC
+        LIMIT ? OFFSET ?;
+      `;
+
+      const params = list_id ? [list_id, limit, offset] : [limit, offset];
+      const [rows] = await db.query<any[]>(query, params);
+
+      let countQuery = `
+        SELECT COUNT(*) AS total
+        FROM vicidial_list AS vlead
+        WHERE vlead.phone_number IN (
+          SELECT phone_number
+          FROM vicidial_list
+          GROUP BY phone_number
+          HAVING COUNT(*) > 1
+        )
+      `;
+
+      if (list_id) {
+        countQuery += ` AND vlead.list_id = ? `;
+      }
+
+      const [countResult] = await db.query<any[]>(countQuery, list_id ? [list_id] : []);
+      const total = countResult[0]?.total || 0;
+
+      res.json({
+        currentPage: page,
+        totalPages: Math.ceil(total / limit),
+        totalItems: total,
+        items: rows,
+      });
+    } catch (error) {
+      console.error("Error al obtener repeticiones:", error);
+      res.status(500).json({ error: "Error al obtener repeticiones" });
     }
-
-    query += `
-      ORDER BY phone_number, modify_date DESC
-      LIMIT ? OFFSET ?;
-    `;
-
-    const params = list_id ? [list_id, limit, offset] : [limit, offset];
-    const [rows] = await db.query<any[]>(query, params);
-
-    let countQuery = `
-      SELECT COUNT(*) AS total
-      FROM vicidial_list AS vlead
-      WHERE vlead.phone_number IN (
-        SELECT phone_number
-        FROM vicidial_list
-        GROUP BY phone_number
-        HAVING COUNT(*) > 1
-      )
-    `;
-
-    if (list_id) {
-      countQuery += ` AND vlead.list_id = ? `;
-    }
-
-    const [countResult] = await db.query<any[]>(countQuery, list_id ? [list_id] : []);
-    const total = countResult[0]?.total || 0;
-
-    res.json({
-      currentPage: page,
-      totalPages: Math.ceil(total / limit),
-      totalItems: total,
-      items: rows,
-    });
-  } catch (error) {
-    console.error("Error al obtener repeticiones:", error);
-    res.status(500).json({ error: "Error al obtener repeticiones" });
-  }
-};
-
-
-
+  };
 
   deleteById = async (req: any, res: any) => {
     const { leadId } = req.params;
