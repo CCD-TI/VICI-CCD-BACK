@@ -253,39 +253,66 @@ export class HistorialController {
   } 
   
   repeticionesglobal = async (req: any, res: any) => {
-    try {
-      const [rows] = await db.query<any[]>(`
-        SELECT 
-          phone_number,
-          first_name,
-          last_name,
-          comments,
-          modify_date
-        FROM vicidial_list
-        WHERE phone_number IN (
-          SELECT phone_number
-          FROM vicidial_list
-          GROUP BY phone_number
-          HAVING COUNT(*) > 1
-        )
-        ORDER BY phone_number, modify_date DESC;
-      `);
+  try {
+    // Leer parámetros de paginación
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
 
-      res.json(rows);
-    } catch (error) {
-      console.error("Error al obtener repeticiones:", error);
-      res.status(500).json({ error: "Error al obtener repeticiones" });
-    }
-  };
+    // Consulta principal con paginación
+    const [rows] = await db.query<any[]>(`
+      SELECT 
+        phone_number,
+        first_name,
+        last_name,
+        comments,
+        modify_date
+      FROM vicidial_list
+      WHERE phone_number IN (
+        SELECT phone_number
+        FROM vicidial_list
+        GROUP BY phone_number
+        HAVING COUNT(*) > 1
+      )
+      ORDER BY phone_number, modify_date DESC
+      LIMIT ? OFFSET ?;
+    `, [limit, offset]);
+
+    // Consulta para obtener el total de registros (sin paginar)
+    const [countResult] = await db.query<any[]>(`
+      SELECT COUNT(*) AS total
+      FROM vicidial_list
+      WHERE phone_number IN (
+        SELECT phone_number
+        FROM vicidial_list
+        GROUP BY phone_number
+        HAVING COUNT(*) > 1
+      );
+    `);
+
+    const total = countResult[0]?.total || 0;
+
+    res.json({
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
+      totalItems: total,
+      items: rows,
+    });
+  } catch (error) {
+    console.error("Error al obtener repeticiones:", error);
+    res.status(500).json({ error: "Error al obtener repeticiones" });
+  }
+};
+
 
 
   deleteById = async (req: any, res: any) => {
-    const { userId, leadId } = req.params;
+    const { leadId } = req.params;
 
     try {
       const [rows] = await db.query(
-        `SELECT * FROM vicidial_list WHERE user = ? AND lead_id = ?`,
-        [userId, leadId]
+        `SELECT * FROM vicidial_list WHERE lead_id = ?`,
+        [leadId]
       );
 
       if (Array.isArray(rows) && rows.length === 0) {
@@ -293,8 +320,8 @@ export class HistorialController {
       }
 
       const [result] = await db.query(
-        `DELETE FROM vicidial_list WHERE user = ? AND lead_id = ?`,
-        [userId, leadId]
+        `DELETE FROM vicidial_list WHERE lead_id = ?`,
+        [leadId]
       );
 
       if ((result as any).affectedRows === 0) {
