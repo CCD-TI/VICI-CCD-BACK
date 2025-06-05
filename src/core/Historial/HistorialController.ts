@@ -253,40 +253,30 @@ export class HistorialController {
   } 
   
   repeticionesglobal = async (req: any, res: any) => {
-  const { phone_number} = req.query;
+    try {
+      const [rows] = await db.query<any[]>(`
+        SELECT 
+          phone_number,
+          first_name,
+          last_name,
+          comments,
+          modify_date
+        FROM vicidial_list
+        WHERE phone_number IN (
+          SELECT phone_number
+          FROM vicidial_list
+          GROUP BY phone_number
+          HAVING COUNT(*) > 1
+        )
+        ORDER BY phone_number, modify_date DESC;
+      `);
 
-  try {
-    const [rows] = await db.query<any[]>(`
-      SELECT 
-        vlead.lead_id,
-        vlead.comments, 
-        vlead.modify_date,
-        vlead.first_name, 
-        vlead.last_name,
-        vlead.address1,
-        vlead.address2,
-        vlead.address3,
-        vlead.phone_number,
-        vlead.email,
-        COALESCE(vstatus_camp.status_name, vstatus_sys.status_name, vlead.status) AS status_display,
-        vuser.full_name AS user_full_name
-      FROM vicidial_list AS vlead
-      LEFT JOIN vicidial_campaign_statuses AS vstatus_camp 
-        ON vstatus_camp.status = vlead.status
-      LEFT JOIN vicidial_statuses AS vstatus_sys 
-        ON vstatus_sys.status = vlead.status
-      LEFT JOIN vicidial_users AS vuser 
-        ON vuser.user = vlead.user
-      WHERE vlead.phone_number = ?
-      GROUP BY vlead.modify_date;
-    `, [phone_number]);
-
-    res.json(rows); // Devolvemos todas las columnas seleccionadas
-  } catch (error) {
-    console.error("Error al obtener repeticiones:", error);
-    res.status(500).json({ error: "Error interno al obtener repeticiones" });
-  }
-};
+      res.json(rows);
+    } catch (error) {
+      console.error("Error al obtener repeticiones:", error);
+      res.status(500).json({ error: "Error al obtener repeticiones" });
+    }
+  };
 
 
   deleteById = async (req: any, res: any) => {
