@@ -254,14 +254,16 @@ export class HistorialController {
   
   repeticionesglobal = async (req: any, res: any) => {
   try {
-    // Leer parámetros de paginación
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
-    // Consulta principal con paginación
-    const [rows] = await db.query<any[]>(`
-      SELECT 
+    const list_id = req.query.list_id;
+
+    let query = `
+      SELECT
+        list_id,
+        lead_id,
         phone_number,
         first_name,
         last_name,
@@ -274,12 +276,21 @@ export class HistorialController {
         GROUP BY phone_number
         HAVING COUNT(*) > 1
       )
+    `;
+
+    if (list_id) {
+      query += ` AND list_id = ? `;
+    }
+
+    query += `
       ORDER BY phone_number, modify_date DESC
       LIMIT ? OFFSET ?;
-    `, [limit, offset]);
+    `;
 
-    // Consulta para obtener el total de registros (sin paginar)
-    const [countResult] = await db.query<any[]>(`
+    const params = list_id ? [list_id, limit, offset] : [limit, offset];
+    const [rows] = await db.query<any[]>(query, params);
+
+    let countQuery = `
       SELECT COUNT(*) AS total
       FROM vicidial_list
       WHERE phone_number IN (
@@ -287,9 +298,14 @@ export class HistorialController {
         FROM vicidial_list
         GROUP BY phone_number
         HAVING COUNT(*) > 1
-      );
-    `);
+      )
+    `;
 
+    if (list_id) {
+      countQuery += ` AND list_id = ? `;
+    }
+
+    const [countResult] = await db.query<any[]>(countQuery, list_id ? [list_id] : []);
     const total = countResult[0]?.total || 0;
 
     res.json({
