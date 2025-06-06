@@ -4,6 +4,7 @@ import { UserLogController } from '../core/Historial/DetalleAgenteController';
 const DetalleRouter = Router();
 const userLogController = new UserLogController();
 
+DetalleRouter.get('/cantTipificaciones', userLogController.getAgenteTipificado);
 DetalleRouter.get('/user', userLogController.getUsers);
 DetalleRouter.get('/:userId', userLogController.getLogsByUser);
 

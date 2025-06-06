@@ -46,4 +46,31 @@ export class ReporteController {
       res.status(500).json({ error: "Error al obtener leads" });
     }
   };
+  TiemposdeActividadeInactividadPromedio = async (req: any, res: any) => {
+    try {
+      let query = `
+      SELECT 
+          AVG(tiempo_actividad) AS promedio_actividad,
+          AVG(tiempo_inactividad) AS promedio_inactividad
+      FROM (
+          SELECT 
+              user,
+              SUM(talk_sec + dispo_sec) AS tiempo_actividad,
+              SUM(wait_sec + pause_sec) AS tiempo_inactividad
+          FROM 
+              vicidial_agent_log
+          WHERE 
+              event_time >= CURDATE()
+          GROUP BY 
+              user
+      ) AS resumen_por_agente;
+      `
+      const [rows] = await db.query<any[]>(query);
+      res.json(rows);
+    } catch (error) {
+      console.error("Error al obtener tiempos de actividad:", error);
+      res.status(500).json({ error: "Error al obtener tiempos de actividad" });
+    }
+  }
+  
 }

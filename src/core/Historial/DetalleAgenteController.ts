@@ -1,7 +1,9 @@
 import { Request, Response } from 'express';
 import { db } from "../../config/db";
-//import moment from "moment";
+import moment from "moment";
 import { Temporal } from 'temporal-polyfill';
+import { mapTipificacion } from '../../Utils/utils';
+import { AgenteTipificado } from '../../Dtos/AgenteTipificado';
 interface EventCount {
   event: string;
   event_count: number;
@@ -42,7 +44,6 @@ export class UserLogController {
         default:
           eventCondition = "AND event IN ('LOGIN', 'LOGOUT')";
       }
-      /*
       const start = startDate 
         ? moment.utc(String(startDate)).startOf('day').format('YYYY-MM-DD HH:mm:ss')
         : '';
@@ -51,7 +52,7 @@ export class UserLogController {
         : startDate
         ? moment.utc(String(startDate)).endOf('day').format('YYYY-MM-DD HH:mm:ss')
         : '';
-      */
+      /*
       const start = startDate 
         ? Temporal.PlainDate.from(String(startDate)).toZonedDateTime('UTC').startOfDay().toString()
         : '';
@@ -60,7 +61,7 @@ export class UserLogController {
         : startDate
         ? Temporal.PlainDate.from(String(startDate)).toZonedDateTime('UTC').with({ hour: 23, minute: 59, second: 59, millisecond: 999 }).toString()
         : '';
-
+      */
       let totalQuery = `
         SELECT COUNT(*) as total
         FROM asterisk.vicidial_user_log
@@ -71,10 +72,10 @@ export class UserLogController {
 
       const totalQueryParams = [userId];
       if (start) {
-        //totalQueryParams.push(start, end || moment.utc(start).endOf('day').format('YYYY-MM-DD HH:mm:ss'));
-        totalQueryParams.push(start, end || Temporal.PlainDate.from(String(startDate)).toZonedDateTime('UTC').with({ hour: 23, minute: 59, second: 59, millisecond: 999 }).toString());
+        totalQueryParams.push(start, end || moment.utc(start).endOf('day').format('YYYY-MM-DD HH:mm:ss'));
+        //totalQueryParams.push(start, end || Temporal.PlainDate.from(String(startDate)).toPlainDateTime('UTC').toString());
       }
-
+      console.log(totalQuery, totalQueryParams);
       const [totalRows] = await db.query(totalQuery, totalQueryParams);
       const totalResult = (totalRows as { total: number }[])[0];
       const total = totalResult?.total || 0;
@@ -98,8 +99,8 @@ export class UserLogController {
 
       const queryParams = [userId];
       if (start) {
-        //queryParams.push(start, end || moment.utc(start).endOf('day').format('YYYY-MM-DD HH:mm:ss'));
-        queryParams.push(start, end || Temporal.PlainDate.from(String(startDate)).toZonedDateTime('UTC').with({ hour: 23, minute: 59, second: 59, millisecond: 999 }).toString());
+        queryParams.push(start, end || moment.utc(start).endOf('day').format('YYYY-MM-DD HH:mm:ss'));
+        //queryParams.push(start, end || Temporal.PlainDate.from(String(startDate)).toZonedDateTime('UTC').with({ hour: 23, minute: 59, second: 59, millisecond: 999 }).toString());
       }
 
       const [logs] = await db.query(query, queryParams);
@@ -176,5 +177,88 @@ export class UserLogController {
     }
   };
 
+  getAgenteTipificado = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { user, startDate, endDate } = req.query;
+      let query = `
+      SELECT 
+          vl.user, 
+          vu.full_name, 
+          vl.status, 
+          COUNT(*) AS cantidad
+      FROM 
+          vicidial_list AS vl
+      INNER JOIN 
+          vicidial_users AS vu ON vl.user = vu.user
+      WHERE 
+          vl.status IN ('1101', '1102', '1202', '1201', '1203', '1301')
+      `;
+      if(user){
+        query += `and vl.user = "${user}" ` 
+      }
+      if(startDate && endDate){
+       query += `and vl.modify_date between "${startDate}" and "${endDate}" ` 
+      }else{
+        query += `and vl.modify_date > CURDATE() ` 
+      }
+      //agregando agrupacion
+      query += `
+      GROUP BY 
+          vl.user, vl.status
+      ORDER BY 
+          vl.user, vl.status;`;
+      console.log(query);
+      const [result] = await db.query(query);
+      const agentesMap = new Map<string, AgenteTipificado>();
 
+      (result as any[]).forEach((item: any) => {
+          const status = mapTipificacion(item.status);
+          const userId = item.user;
+
+          // Initialize the agent object if it doesn't exist
+          if (!agentesMap.has(userId)) {
+              agentesMap.set(userId, {
+                  dni: item.user,
+                  nombre: item.full_name,
+                  matriculados: 0,
+                  muy_interesados: 0,
+                  pago_incompleto: 0,
+                  volver_a_llamar: 0,
+                  separacion_de_vacante: 0
+              });
+          }
+
+          // Update the corresponding status count
+          const agente = agentesMap.get(userId)!;
+          switch (status) {
+              case 'MATRICULADO':
+                  agente.matriculados = item.cantidad;
+                  break;
+              case 'MUY INTERESADO':
+                  agente.muy_interesados = item.cantidad;
+                  break;
+              case 'PAGO INCOMPLETO':
+                  agente.pago_incompleto = item.cantidad;
+                  break;
+              case 'VOLVER A LLAMAR':
+                  agente.volver_a_llamar = item.cantidad;
+                  break;
+              case 'SEPARACIÓN DE VACANTE':
+                  agente.separacion_de_vacante = item.cantidad;
+                  break;
+              // Ignore other statuses not in AgenteTipificado
+          }
+      });
+
+      // Convert map to array
+      const mapeado = Array.from(agentesMap.values());
+      res.json(mapeado);
+    } catch (error) {
+      console.error("Error al obtener logs de usuario:", error);
+      res.status(500).json({ 
+        error: "Error al procesar la solicitud",
+        details: process.env.NODE_ENV === 'development' && error instanceof Error ? error.message : undefined
+      });
+    }
+  }
 }
