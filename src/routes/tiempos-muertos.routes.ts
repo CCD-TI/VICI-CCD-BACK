@@ -7,5 +7,6 @@ const deadTimeController = new DeadTimeController();
 
 TiemposMuertosRouter.get('/totalPausas', verifyToken, requireAdmin, deadTimeController.getTiempoTotal);
 TiemposMuertosRouter.get('/pausasPorTipo', verifyToken, deadTimeController.getTiemposPorTipo);
+TiemposMuertosRouter.get('/pausasPorTipoFecha', verifyToken, deadTimeController.getTiemposPorTipoFecha);
 
 export default TiemposMuertosRouter;
