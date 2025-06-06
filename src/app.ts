@@ -4,6 +4,7 @@ import GestionHistorialRouter from "./routes/gestion.routes";
 import AuthRouter from "./routes/auth.routes";
 import HistorialUserslRouter from "./routes/historial_users.routes";
 import ReporteRouter from "./routes/reporte.routes";
+import DetalleRouter from "./routes/detalle_agente.routes";
 
 class App {
   private server: Application;
