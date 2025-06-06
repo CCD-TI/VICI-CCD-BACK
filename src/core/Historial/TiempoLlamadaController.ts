@@ -20,7 +20,7 @@ export class TiempollamadaController {
           AND vl.call_date LIKE ?
         ORDER BY vl.call_date DESC
       `;
-      const [results] = await db.query(query, [userId, `%2025-06-05%`]) as any[];
+      const [results] = await db.query(query, [userId, `%2025-06-06%`]) as any[];
       
       // Definir el tipo para los datos agrupados
       interface GroupedStatus {
@@ -127,58 +127,79 @@ export class TiempollamadaController {
 
   getAllByUser = async (req: any, res: any) => {
     try {
+      const { desde, hasta } = req.query;
+
+      const today = new Date();
+      const endDate = hasta ? new Date(hasta) : today;
+      const startDate = desde
+        ? new Date(desde)
+        : new Date(today.getTime() - 6 * 24 * 60 * 60 * 1000);
+
+      const formatDate = (date: Date) => {
+        const yyyy = date.getFullYear();
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const dd = String(date.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+      };
+
+      const formattedStart = formatDate(startDate);
+      const formattedEnd = formatDate(endDate);
+
       const query = `
-        SELECT vl.call_date, vl.phone_number, vl.status, vl.length_in_sec, vl.term_reason, vl.campaign_id, vl.user
-        FROM asterisk.vicidial_log vl
-        WHERE vl.call_date LIKE '%2025-06-05%'
+        SELECT vl.call_date, vl.phone_number, vl.status, vl.length_in_sec, vl.term_reason, vl.campaign_id, vu.full_name
+        FROM asterisk.vicidial_log vl inner join vicidial_users vu on vl.user = vu.user
+        WHERE vl.call_date BETWEEN ? AND ?
           AND vl.user <> 'VDAD'
         ORDER BY vl.call_date DESC
       `;
-      
-      const [results] = await db.query(query) as any[];
-      
-      // Definir tipos
+
+      const [results] = await db.query(query, [`${formattedStart} 00:00:00`, `${formattedEnd} 23:59:59`]) as any[];
+
       interface GroupedStatus {
         status: string;
         status_name: string;
         cantidad: number;
         segundos: number;
       }
-      
+
+      interface DailyStatusSummary {
+        statuses: GroupedStatus[];
+        total_cantidad: number;
+        total_segundos: number;
+      }
+
       interface UserData {
         user: string;
         status_details: GroupedStatus[];
+        status_by_day: { [date: string]: DailyStatusSummary };
         total_status: number;
         total_segundos: number;
       }
-      
-      // Agrupar por usuario
+
       const userGroups: { [key: string]: any[] } = {};
-      
       results.forEach((row: any) => {
-        const userId = row.user;
+        const userId = row.full_name;
         if (!userGroups[userId]) {
           userGroups[userId] = [];
         }
         userGroups[userId].push(row);
       });
-      
-      // Procesar cada usuario
+
       const usersData: UserData[] = [];
       let totalGeneralStatus = 0;
       let totalGeneralSegundos = 0;
-      
-      // Para el resumen global de status
       const globalStatusSummary: { [key: string]: GroupedStatus } = {};
-      
+
       for (const [userId, userRows] of Object.entries(userGroups)) {
-        // Agrupar por status para este usuario
         const statusGroups: { [key: string]: GroupedStatus } = {};
-        
+        const dailyGroups: { [date: string]: { [status: string]: GroupedStatus } } = {};
+
         userRows.forEach((row: any) => {
           const status = row.status;
           const lengthInSec = parseInt(row.length_in_sec) || 0;
-          
+          const callDate = formatDate(new Date(row.call_date)); // Extraer solo fecha
+
+          // Agrupación global por usuario
           if (statusGroups[status]) {
             statusGroups[status].cantidad += 1;
             statusGroups[status].segundos += lengthInSec;
@@ -188,11 +209,11 @@ export class TiempollamadaController {
               status: status,
               status_name: statusInfo.statusname,
               cantidad: 1,
-              segundos: lengthInSec
+              segundos: lengthInSec,
             };
           }
-          
-          // Agregar al resumen global
+
+          // Agrupación global general
           if (globalStatusSummary[status]) {
             globalStatusSummary[status].cantidad += 1;
             globalStatusSummary[status].segundos += lengthInSec;
@@ -202,45 +223,78 @@ export class TiempollamadaController {
               status: status,
               status_name: statusInfo.statusname,
               cantidad: 1,
-              segundos: lengthInSec
+              segundos: lengthInSec,
+            };
+          }
+
+          // Agrupar por día y status para el usuario
+          if (!dailyGroups[callDate]) {
+            dailyGroups[callDate] = {};
+          }
+          if (dailyGroups[callDate][status]) {
+            dailyGroups[callDate][status].cantidad += 1;
+            dailyGroups[callDate][status].segundos += lengthInSec;
+          } else {
+            const statusInfo = this.getStatusName(status);
+            dailyGroups[callDate][status] = {
+              status: status,
+              status_name: statusInfo.statusname,
+              cantidad: 1,
+              segundos: lengthInSec,
             };
           }
         });
-        
-        // Calcular totales por usuario
+
+        // Convertir statusGroups a array
         const statusArray = Object.values(statusGroups);
         const userTotalStatus = statusArray.reduce((sum, item) => sum + item.cantidad, 0);
         const userTotalSegundos = statusArray.reduce((sum, item) => sum + item.segundos, 0);
-        
-        // Agregar a totales generales
+
         totalGeneralStatus += userTotalStatus;
         totalGeneralSegundos += userTotalSegundos;
-        
+
+        // Construir el objeto status_by_day con totales
+        const status_by_day: { [date: string]: DailyStatusSummary } = {};
+        for (const [date, statusesObj] of Object.entries(dailyGroups)) {
+          const statusList = Object.values(statusesObj);
+          const total_cantidad = statusList.reduce((sum, s) => sum + s.cantidad, 0);
+          const total_segundos = statusList.reduce((sum, s) => sum + s.segundos, 0);
+
+          status_by_day[date] = {
+            statuses: statusList,
+            total_cantidad,
+            total_segundos,
+          };
+        }
+
         usersData.push({
           user: userId,
           status_details: statusArray,
+          status_by_day,
           total_status: userTotalStatus,
-          total_segundos: userTotalSegundos
+          total_segundos: userTotalSegundos,
         });
       }
-      
-      // Ordenar usuarios por total de status (mayor a menor)
+
       usersData.sort((a, b) => b.total_status - a.total_status);
-      
-      // Convertir el resumen global a array y ordenar por cantidad
+
       const globalStatusArray = Object.values(globalStatusSummary);
       globalStatusArray.sort((a, b) => b.cantidad - a.cantidad);
-      
+
       const response = {
+        rango: {
+          desde: formattedStart,
+          hasta: formattedEnd,
+        },
         users: usersData,
         totals: {
           total_usuarios: usersData.length,
           total_status_general: totalGeneralStatus,
-          total_segundos_general: totalGeneralSegundos
+          total_segundos_general: totalGeneralSegundos,
         },
-        global_status_summary: globalStatusArray
+        global_status_summary: globalStatusArray,
       };
-      
+
       return res.json(response);
     } catch (error) {
       console.error("DB query error:", error);
