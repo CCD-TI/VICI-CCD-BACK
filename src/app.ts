@@ -5,6 +5,8 @@ import AuthRouter from "./routes/auth.routes";
 import HistorialUserslRouter from "./routes/historial_users.routes";
 import tiempollamadaRouter from "./routes/tiempollamada.routes";
 import ReporteRouter from "./routes/reporte.routes";
+import DetalleRouter from "./routes/detalle_agente.routes";
+import TiemposMuertosRouter from "./routes/tiempos-muertos.routes";
 
 class App {
   private server: Application;
@@ -35,7 +37,9 @@ class App {
     this.server.use("/api/llamadas", tiempollamadaRouter)
     this.server.use("/api/gestion", GestionHistorialRouter);
     this.server.use("/api/auth", AuthRouter);
+    this.server.use("/api/log", DetalleRouter);
     this.server.use("/api/usuario_historial", HistorialUserslRouter)
+    this.server.use("/api/tiemposMuertos", TiemposMuertosRouter)
     this.server.use("/api/reportes", ReporteRouter)
 
     // Ruta de prueba
