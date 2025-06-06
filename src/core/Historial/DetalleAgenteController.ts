@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { db } from "../../config/db";
-import moment from "moment";
-
+//import moment from "moment";
+import { Temporal } from 'temporal-polyfill';
 interface EventCount {
   event: string;
   event_count: number;
@@ -42,7 +42,7 @@ export class UserLogController {
         default:
           eventCondition = "AND event IN ('LOGIN', 'LOGOUT')";
       }
-
+      /*
       const start = startDate 
         ? moment.utc(String(startDate)).startOf('day').format('YYYY-MM-DD HH:mm:ss')
         : '';
@@ -50,6 +50,15 @@ export class UserLogController {
         ? moment.utc(String(endDate)).endOf('day').format('YYYY-MM-DD HH:mm:ss')
         : startDate
         ? moment.utc(String(startDate)).endOf('day').format('YYYY-MM-DD HH:mm:ss')
+        : '';
+      */
+      const start = startDate 
+        ? Temporal.PlainDate.from(String(startDate)).toZonedDateTime('UTC').startOfDay().toString()
+        : '';
+      let end = endDate
+        ? Temporal.PlainDate.from(String(endDate)).toZonedDateTime('UTC').with({ hour: 23, minute: 59, second: 59, millisecond: 999 }).toString()
+        : startDate
+        ? Temporal.PlainDate.from(String(startDate)).toZonedDateTime('UTC').with({ hour: 23, minute: 59, second: 59, millisecond: 999 }).toString()
         : '';
 
       let totalQuery = `
@@ -62,7 +71,8 @@ export class UserLogController {
 
       const totalQueryParams = [userId];
       if (start) {
-        totalQueryParams.push(start, end || moment.utc(start).endOf('day').format('YYYY-MM-DD HH:mm:ss'));
+        //totalQueryParams.push(start, end || moment.utc(start).endOf('day').format('YYYY-MM-DD HH:mm:ss'));
+        totalQueryParams.push(start, end || Temporal.PlainDate.from(String(startDate)).toZonedDateTime('UTC').with({ hour: 23, minute: 59, second: 59, millisecond: 999 }).toString());
       }
 
       const [totalRows] = await db.query(totalQuery, totalQueryParams);
@@ -88,7 +98,8 @@ export class UserLogController {
 
       const queryParams = [userId];
       if (start) {
-        queryParams.push(start, end || moment.utc(start).endOf('day').format('YYYY-MM-DD HH:mm:ss'));
+        //queryParams.push(start, end || moment.utc(start).endOf('day').format('YYYY-MM-DD HH:mm:ss'));
+        queryParams.push(start, end || Temporal.PlainDate.from(String(startDate)).toZonedDateTime('UTC').with({ hour: 23, minute: 59, second: 59, millisecond: 999 }).toString());
       }
 
       const [logs] = await db.query(query, queryParams);
