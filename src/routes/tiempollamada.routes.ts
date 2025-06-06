@@ -1,12 +1,14 @@
 import { Router} from 'express';
 import { db } from '../config/db';
 import { TiempollamadaController } from '../core/Historial/TiempoLlamadaController';
-import { verifyToken } from '../core/auth/auth.middleware';
+import { requireAdmin, verifyToken } from '../core/auth/auth.middleware';
 
 const tiempollamadaRouter = Router();
-const tiempollamadaControlller = new TiempollamadaController();
+const tiempollamadaController = new TiempollamadaController();
 
-tiempollamadaRouter.get('/usuario/:userId', tiempollamadaControlller.getAllByUser);
+tiempollamadaRouter.get('/', verifyToken, requireAdmin, tiempollamadaController.getByDate);
+tiempollamadaRouter.get('/usuario/:userId', tiempollamadaController.getAllByUser);
+
 //GestionHistorialRouter.get('/resumen/:userId', historiauserslController.getResumenByUser);
 
 export default tiempollamadaRouter;
