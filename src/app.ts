@@ -3,6 +3,7 @@ import cors from "cors";
 import GestionHistorialRouter from "./routes/gestion.routes";
 import AuthRouter from "./routes/auth.routes";
 import HistorialUserslRouter from "./routes/historial_users.routes";
+import tiempollamadaRouter from "./routes/tiempollamada.routes";
 
 class App {
   private server: Application;
@@ -30,6 +31,7 @@ class App {
 
   private routes(): void {
     // Rutas de la API
+    this.server.use("/api/llamadas", tiempollamadaRouter)
     this.server.use("/api/gestion", GestionHistorialRouter);
     this.server.use("/api/auth", AuthRouter);
     this.server.use("/api/usuario_historial", HistorialUserslRouter)
