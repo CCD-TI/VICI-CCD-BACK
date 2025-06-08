@@ -304,73 +304,80 @@ export class TiempollamadaController {
   };
 
   getByDate = async (req: Request, res: Response): Promise<void> => {
-    const { user, date } = req.query;
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 20;
-    const offset = (page - 1) * limit;
+  const { user, date, called_number } = req.query;
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 20;
+  const offset = (page - 1) * limit;
 
-    try {
-      let baseQuery = `
-        FROM asterisk.recording_log rl
-      `;
-      const conditions: string[] = [];
-      const params: any[] = [];
+  try {
+    let baseQuery = `
+      FROM asterisk.recording_log rl
+      LEFT JOIN asterisk.vicidial_list vl ON rl.lead_id = vl.lead_id
+    `;
+    const conditions: string[] = [];
+    const params: any[] = [];
 
-      if (user) {
-        conditions.push('rl.user = ?');
-        params.push(user);
-      }
-
-      if (date) {
-        conditions.push('DATE(rl.start_time) = ?');
-        params.push(date);
-      }
-
-      const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
-
-      // Query total count
-      const [countRows] = await db.query<any[]>(
-        `SELECT COUNT(*) as total ${baseQuery} ${whereClause}`,
-        params
-      );
-      const total = countRows[0]?.total || 0;
-
-      // Main data query
-      const [rows] = await db.query<any[]>(
-        `
-        SELECT 
-          rl.recording_id,
-          rl.start_time,
-          rl.end_time,
-          rl.location,
-          rl.lead_id,
-          rl.user
-        ${baseQuery}
-        ${whereClause}
-        ORDER BY rl.start_time DESC
-        LIMIT ? OFFSET ?
-        `,
-        [...params, limit, offset]
-      );
-
-      const updatedRows = rows.map(row => ({
-        ...row,
-        location: row.location
-          ? row.location.replace('https://192.168.1.210/', 'https://vicidial.grupowya.com/')
-          : null
-      }));
-
-      res.json({
-        llamadas: updatedRows,
-        currentPage: page,
-        totalItems: total,
-        totalPages: Math.ceil(total / limit)
-      });
-    } catch (error) {
-      console.error('Error al obtener grabaciones:', error);
-      res.status(500).json({ error: 'Error al obtener grabaciones' });
+    if (user) {
+      conditions.push('rl.user = ?');
+      params.push(user);
     }
-  };
+
+    if (date) {
+      conditions.push('DATE(rl.start_time) = ?');
+      params.push(date);
+    }
+
+    if (called_number) {
+      conditions.push('vl.phone_number LIKE ?');
+      params.push(`%${called_number}%`);
+    }
+
+    const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
+
+    // Total count
+    const [countRows] = await db.query<any[]>(
+      `SELECT COUNT(*) as total ${baseQuery} ${whereClause}`,
+      params
+    );
+    const total = countRows[0]?.total || 0;
+
+    // Main data query
+    const [rows] = await db.query<any[]>(
+      `
+      SELECT 
+        rl.recording_id,
+        rl.start_time,
+        rl.end_time,
+        rl.location,
+        rl.lead_id,
+        rl.user,
+        vl.phone_number AS called_number
+      ${baseQuery}
+      ${whereClause}
+      ORDER BY rl.start_time DESC
+      LIMIT ? OFFSET ?
+      `,
+      [...params, limit, offset]
+    );
+
+    const updatedRows = rows.map(row => ({
+      ...row,
+      location: row.location
+        ? row.location.replace('https://192.168.1.210/', 'https://vicidial.grupowya.com/')
+        : null
+    }));
+
+    res.json({
+      llamadas: updatedRows,
+      currentPage: page,
+      totalItems: total,
+      totalPages: Math.ceil(total / limit)
+    });
+  } catch (error) {
+    console.error('Error al obtener grabaciones:', error);
+    res.status(500).json({ error: 'Error al obtener grabaciones' });
+  }
+};
 
 
 }
