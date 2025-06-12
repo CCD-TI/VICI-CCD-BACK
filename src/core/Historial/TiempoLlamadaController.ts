@@ -313,6 +313,7 @@ export class TiempollamadaController {
       let baseQuery = `
         FROM asterisk.recording_log rl
         LEFT JOIN asterisk.vicidial_list vl ON rl.lead_id = vl.lead_id
+        LEFT JOIN asterisk.vicidial_users vuser ON rl.user = vuser.user
       `;
       const conditions: string[] = [];
       const params: any[] = [];
@@ -354,6 +355,7 @@ export class TiempollamadaController {
           rl.location,
           rl.lead_id,
           rl.user,
+          vuser.full_name AS user_name,
           vl.phone_number AS called_number
         ${baseQuery}
         ${whereClause}
