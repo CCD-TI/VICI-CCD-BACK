@@ -7,7 +7,10 @@ import tiempollamadaRouter from "./routes/tiempollamada.routes";
 import ReporteRouter from "./routes/reporte.routes";
 import DetalleRouter from "./routes/detalle_agente.routes";
 import TiemposMuertosRouter from "./routes/tiempos-muertos.routes";
-
+import UsuariosRouter from "./routes/usuarios.routes";
+import CampaignRouter from "./routes/campaign.routes";
+import listsRouter from "./routes/lists.routes";
+import ReasignacionesRouter from "./routes/reasignaciones.routes";
 class App {
   private server: Application;
 
@@ -41,7 +44,10 @@ class App {
     this.server.use("/api/usuario_historial", HistorialUserslRouter)
     this.server.use("/api/tiemposMuertos", TiemposMuertosRouter)
     this.server.use("/api/reportes", ReporteRouter)
-
+    this.server.use("/api/usuarios", UsuariosRouter)
+    this.server.use("/api/campaigns", CampaignRouter)
+    this.server.use("/api/lists", listsRouter)
+    this.server.use("/api/reasignaciones", ReasignacionesRouter)
     // Ruta de prueba
     this.server.get("/health", (req: Request, res: Response) => {
       res.status(200).json({ status: "ok", message: "Server is running" });

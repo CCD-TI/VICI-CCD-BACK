@@ -1,14 +1,14 @@
 import { db } from "../../config/db";
+import { dbmalcriada } from "../../config/dbmalcriada";
 
 export class HistorialController {
   getAllByUser = async (req: any, res: any) => {
-    const { userId } = req.params;
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 10;
-    const offset = (page - 1) * limit;
     const {
+      page,
+      limit,
       estado,
       cod_campaign,
+      usuario,
       dni,
       nombre_participante,
       nombre_curso,
@@ -20,7 +20,16 @@ export class HistorialController {
       nombre,
       comments,
       fecha,
-    } = req.query;
+      list_id,
+      campaign_id,
+      statuses,
+      agentes,
+      datedesde,
+      datehasta,
+      entry_date,
+      modify_date,
+    } = req.body;
+    const offset = (page - 1) * limit;
     try {
       /*
         COD_CAMPAÑA: códigos variables de campaña por curso, (un ciodugoi)
@@ -55,100 +64,198 @@ export class HistorialController {
         postal_code
       */
       let query = `SELECT 
-            vlead.last_name,
-            vlead.first_name,
-            vlead.address1,
-            vlead.address3,
-            vlead.city,
-            vlead.province,
-            vlead.phone_number,
-            vlead.email,
-            vlead.comments,
-            vlead.postal_code,
-            vlead.status AS status_code,
-            COALESCE(vstatus_camp.status_name, vstatus_sys.status_name, vlead.status) AS status_display,
-            vuser.full_name,
-            vlead.user,
-            vcampaign.campaign_name,
-            vlead.modify_date
-          FROM vicidial_list AS vlead
-          INNER JOIN vicidial_lists AS vlist ON vlead.list_id = vlist.list_id
-          INNER JOIN vicidial_campaigns AS vcampaign ON vcampaign.campaign_id = vlist.campaign_id
-          LEFT JOIN vicidial_campaign_statuses AS vstatus_camp 
-            ON vstatus_camp.status = vlead.status AND vstatus_camp.campaign_id = vcampaign.campaign_id
-          LEFT JOIN vicidial_statuses AS vstatus_sys ON vstatus_sys.status = vlead.status
-          LEFT JOIN vicidial_users AS vuser ON vuser.user = vlead.user
-          WHERE vlead.user = ?`;
+        vcampaign.campaign_name,
+        vlist.list_name,
+        vlead.last_name,
+        vlead.first_name,
+        vlead.address1,
+        vlead.address3,
+        vlead.city,
+        vlead.province,
+        vlead.phone_number,
+        vlead.email,
+        vlead.comments,
+        vlead.postal_code,
+        vlead.status AS status_code,
+        COALESCE(vstatus_camp.status_name, vstatus_sys.status_name, vlead.status) AS status_display,
+        vuser.full_name,
+        vlead.user,
+        vcampaign.campaign_name,
+        vlead.entry_date,
+        vlead.modify_date
+      FROM vicidial_list AS vlead
+      INNER JOIN vicidial_lists AS vlist ON vlead.list_id = vlist.list_id
+      INNER JOIN vicidial_campaigns AS vcampaign ON vcampaign.campaign_id = vlist.campaign_id
+      LEFT JOIN vicidial_campaign_statuses AS vstatus_camp 
+        ON vstatus_camp.status = vlead.status AND vstatus_camp.campaign_id = vcampaign.campaign_id
+      LEFT JOIN vicidial_statuses AS vstatus_sys ON vstatus_sys.status = vlead.status
+      LEFT JOIN vicidial_users AS vuser ON vuser.user = vlead.user
+      `;
+      // Count query to get total records
+      let countQuery = `SELECT COUNT(*) as total
+      FROM vicidial_list AS vlead
+      INNER JOIN vicidial_lists AS vlist ON vlead.list_id = vlist.list_id
+      INNER JOIN vicidial_campaigns AS vcampaign ON vcampaign.campaign_id = vlist.campaign_id
+      LEFT JOIN vicidial_campaign_statuses AS vstatus_camp 
+        ON vstatus_camp.status = vlead.status AND vstatus_camp.campaign_id = vcampaign.campaign_id
+      LEFT JOIN vicidial_statuses AS vstatus_sys ON vstatus_sys.status = vlead.status
+      LEFT JOIN vicidial_users AS vuser ON vuser.user = vlead.user
+      `;
       // Array to hold query parameters
-      const queryParams: any[] = [userId];
-
+      const queryParams: any[] = [];
+      const countParams: any[] = [];
+      if (
+        usuario ||
+        estado ||
+        cod_campaign ||
+        nombre ||
+        nombre_participante ||
+        nombre_curso ||
+        departamento ||
+        profesion ||
+        phone_number ||
+        email ||
+        campaign ||
+        campaign_id ||
+        nombre ||
+        comments ||
+        fecha ||
+        list_id ||
+        campaign_id ||
+        statuses ||
+        agentes ||
+        datedesde ||
+        datehasta ||
+        entry_date ||
+        modify_date
+      ) {
+        query += " WHERE ";
+        countQuery += " WHERE ";
+      }
       // Dynamically add filter conditions
       const conditions: string[] = [];
-
+      if (usuario) {
+        conditions.push(`vlead.user = ?`);
+        queryParams.push(`${usuario}`);
+        countParams.push(`${usuario}`);
+      }
       if (estado) {
         conditions.push(`vlead.status = ?`);
         queryParams.push(`${estado}`);
+        countParams.push(`${estado}`);
       }
       if (cod_campaign) {
         conditions.push(`vlead.last_name LIKE ?`);
         queryParams.push(`%${cod_campaign}%`);
+        countParams.push(`%${cod_campaign}%`);
+      }
+      if (list_id) {
+        conditions.push(`vlead.list_id = ?`);
+        queryParams.push(`${list_id}`);
+        countParams.push(`${list_id}`);
+      }
+      if (campaign_id) {
+        conditions.push(`vlist.campaign_id = ?`);
+        queryParams.push(`${campaign_id}`);
+        countParams.push(`${campaign_id}`);
+      }
+      if (statuses && statuses.length > 0) {
+        conditions.push(
+          `vlead.status IN (${statuses.map((status: string) => `?`).join(",")})`
+        );
+        queryParams.push(...statuses.map((status: any) => `${status.status}`));
+        countParams.push(...statuses.map((status: any) => `${status.status}`));
+      }
+      if (agentes && agentes.length > 0) {
+        conditions.push(
+          `vlead.user IN (${agentes.map((user: string) => `?`).join(",")})`
+        );
+        queryParams.push(...agentes.map((user: any) => `${user.user}`));
+        countParams.push(...agentes.map((user: any) => `${user.user}`));
       }
       if (nombre) {
         conditions.push(`vlead.first_name LIKE ?`);
-        queryParams.push(`%${dni}%`);
+        queryParams.push(`%${nombre}%`);
+        countParams.push(`%${nombre}%`);
       }
       if (nombre_participante) {
         conditions.push(`vlead.address1 LIKE ?`);
         queryParams.push(`%${nombre_participante}%`);
+        countParams.push(`%${nombre_participante}%`);
       }
       if (nombre_curso) {
         conditions.push(`vlead.address3 LIKE ?`);
         queryParams.push(`%${nombre_curso}%`);
+        countParams.push(`%${nombre_curso}%`);
       }
       if (departamento) {
         conditions.push(`vlead.city LIKE ?`);
         queryParams.push(`%${departamento}%`);
+        countParams.push(`%${departamento}%`);
       }
-      if(profesion) {
+      if (profesion) {
         conditions.push(`vlead.province LIKE ?`);
         queryParams.push(`%${profesion}%`);
+        countParams.push(`%${profesion}%`);
       }
-      
       if (phone_number) {
         conditions.push(`vlead.phone_number LIKE ?`);
         queryParams.push(`%${phone_number}%`);
+        countParams.push(`%${phone_number}%`);
       }
-      
       if (email) {
         conditions.push(`vlead.email LIKE ?`);
         queryParams.push(`%${email}%`);
+        countParams.push(`%${email}%`);
       }
-      
       if (comments) {
         conditions.push(`vlead.comments LIKE ?`);
         queryParams.push(`%${comments}%`);
+        countParams.push(`%${comments}%`);
       }
-
-      /*
-      if (fecha) {
-        
-        conditions.push(`DATE(vlead.modify_date) = ?`);
-        queryParams.push(fecha);
+      if (entry_date) {
+        conditions.push(`vlead.entry_date LIKE ?`);
+        queryParams.push(`%${entry_date}%`);
+        countParams.push(`%${entry_date}%`);
       }
-*/
+      if (modify_date) {
+        conditions.push(`vlead.modify_date LIKE ?`);
+        queryParams.push(`%${modify_date}%`);
+        countParams.push(`%${modify_date}%`);
+      }
+      if (datedesde) {
+        conditions.push(`vlead.entry_date >= ?`);
+        queryParams.push(datedesde);
+        countParams.push(datedesde);
+      }
+      if (datehasta) {
+        conditions.push(`vlead.entry_date <= ?`);
+        queryParams.push(datehasta);
+        countParams.push(datehasta);
+      }
       // Append conditions to query if any exist
       if (conditions.length > 0) {
-        query += ` AND ${conditions.join(" AND ")}`;
+        query += ` ${conditions.join(" AND ")}`;
+        countQuery += ` ${conditions.join(" AND ")}`;
       }
-
-      // Add pagination
+      console.log('FECHAS', datedesde, datehasta);
+      
+      
+      // Add pagination to main query
       query += ` ORDER BY status_code DESC LIMIT ? OFFSET ?`;
       queryParams.push(limit, offset);
+      console.log(query, queryParams);
+      console.log(countQuery, countParams);
+      // Execute both queries
       const [rows] = await db.query(query, queryParams);
-
+      const [countResult] = await db.query(countQuery, countParams);
+      const total = (countResult as { total: number }[])[0].total;
+      const totalPages = Math.ceil(total / limit);
       res.json({
         page,
         limit,
+        total,
+        totalPages,
         results: rows,
       });
     } catch (error) {
@@ -157,16 +264,19 @@ export class HistorialController {
     }
   };
   getResumenByUser = async (req: any, res: any) => {
-    const { userId } = req.params;
+    const { user } = req.query;
     try {
-      const [rows] = await db.query<any[]>(
-        `SELECT status, COUNT(*) AS cantidad
-            FROM vicidial_list
-            WHERE user = ?
-            GROUP BY status
-            ORDER BY cantidad DESC;`,
-        [userId]
-      );
+      let query = `SELECT status, COUNT(*) AS cantidad
+            FROM vicidial_list`;
+      const params = [];
+
+      if (user) {
+        query += " WHERE user = ?";
+        params.push(user);
+      }
+      query += ` GROUP BY status ORDER BY cantidad DESC;`;
+      console.log(query, params);
+      const [rows] = await db.query<any[]>(query, params);
       const resumen = rows.map((res: any) => ({
         id: res.status,
         cantidad: res.cantidad,
@@ -235,7 +345,7 @@ export class HistorialController {
     }
   };
 
-  repeticiones = async (req : any, res: any) => {
+  repeticiones = async (req: any, res: any) => {
     const { phone_number, userId } = req.query;
     try {
       const [rows] = await db.query<any[]>(
@@ -250,8 +360,8 @@ export class HistorialController {
       console.error("Error al obtener leads:", error);
       res.status(500).json({ error: "Error al obtener leads" });
     }
-  } 
-  
+  };
+
   repeticionesglobal = async (req: any, res: any) => {
     try {
       const page = parseInt(req.query.page) || 1;
@@ -292,7 +402,9 @@ export class HistorialController {
         LIMIT ? OFFSET ?;
       `;
 
-      const params = campaign_name ? [`%${campaign_name}%`, limit, offset] : [limit, offset];
+      const params = campaign_name
+        ? [`%${campaign_name}%`, limit, offset]
+        : [limit, offset];
       const [rows] = await db.query<any[]>(query, params);
 
       let countQuery = `
@@ -312,7 +424,10 @@ export class HistorialController {
         countQuery += ` AND vcampaign.campaign_name LIKE ?`;
       }
 
-      const [countResult] = await db.query<any[]>(countQuery, campaign_name ? [`%${campaign_name}%`] : []);
+      const [countResult] = await db.query<any[]>(
+        countQuery,
+        campaign_name ? [`%${campaign_name}%`] : []
+      );
       const total = countResult[0]?.total || 0;
 
       res.json({
@@ -346,7 +461,9 @@ export class HistorialController {
       );
 
       if ((result as any).affectedRows === 0) {
-        return res.status(404).json({ message: "No se pudo eliminar el registro" });
+        return res
+          .status(404)
+          .json({ message: "No se pudo eliminar el registro" });
       }
 
       res.json({ message: "Registro eliminado correctamente" });
@@ -355,5 +472,307 @@ export class HistorialController {
       res.status(500).json({ error: "Error interno al eliminar el registro" });
     }
   };
+  reasignacion = async (req: any, res: any) => {
+    try {
+      const {
+        active_new_reasignacion,
+        new_list_id,
+        metodo,
+        proceso,
+        activacion_curso,
+        activacion_promocion,
+        activacion_medio,
+        estado,
+        cod_campaign,
+        usuario,
+        dni,
+        nombre_participante,
+        nombre_curso,
+        departamento,
+        profesion,
+        phone_number,
+        email,
+        campaign,
+        nombre,
+        comments,
+        fecha,
+        list_id,
+        campaign_id,
+        statuses,
+        agentes,
+        datedesde,
+        datehasta,
+      } = req.body;
+      /*
+        COD_CAMPAÑA: códigos variables de campaña por curso, (un ciodugoi)
+        last_name
 
+        DNI: dni {sin no hay dni no se colca nada}
+        first_name
+
+        NOMBRE: nombre de participante  
+        address1
+          
+        CAMPAÑA: nombre del curso
+        address3
+
+        DEPARTAMENTO: departamento
+        city
+
+        PROFESION: profesión
+        province
+
+        TELEFONO: teléfono
+        phone_number
+        alt_phone
+
+        CORREO: correo
+        email
+
+        observación:
+        comments
+
+        FECHA
+        postal_code
+      */
+      const [new_list_name] = await db.query(`SELECT list_name FROM vicidial_lists WHERE list_id = ?`, [new_list_id]);
+      const [list_name] = await db.query(`SELECT list_name FROM vicidial_lists WHERE list_id = ?`, [list_id]);
+      
+      if(!list_name && proceso === 'REASIGNACION'){
+        return res.status(404).json({ message: "Listas de origen no encontradas" });
+      }
+      if(!new_list_name && proceso === 'REASIGNACION'){
+        return res.status(404).json({ message: "Listas de destino no encontradas" });
+      }
+      let query = `SELECT 
+      vlead.lead_id,
+      vlead.last_name,
+      vlead.first_name,
+      vlead.address1,
+      vlead.address3,
+      vlead.city,
+      vlead.province,
+      vlead.phone_number,
+      vlead.alt_phone,
+      vlead.email,
+      vlead.comments,
+      vlead.postal_code,
+      vlead.status AS status_code,
+      COALESCE(vstatus_camp.status_name, vstatus_sys.status_name, vlead.status) AS status_display
+    FROM vicidial_list AS vlead
+    INNER JOIN vicidial_lists AS vlist ON vlead.list_id = vlist.list_id
+    INNER JOIN vicidial_campaigns AS vcampaign ON vcampaign.campaign_id = vlist.campaign_id
+    LEFT JOIN vicidial_campaign_statuses AS vstatus_camp 
+      ON vstatus_camp.status = vlead.status AND vstatus_camp.campaign_id = vcampaign.campaign_id
+    LEFT JOIN vicidial_statuses AS vstatus_sys ON vstatus_sys.status = vlead.status
+    LEFT JOIN vicidial_users AS vuser ON vuser.user = vlead.user
+    `;
+      // Array to hold query parameters
+      const queryParams: any[] = [];
+      if (
+        usuario ||
+        estado ||
+        cod_campaign ||
+        nombre ||
+        nombre_participante ||
+        nombre_curso ||
+        departamento ||
+        profesion ||
+        phone_number ||
+        email ||
+        campaign ||
+        campaign_id ||
+        nombre ||
+        comments ||
+        fecha ||
+        list_id ||
+        campaign_id ||
+        statuses ||
+        agentes ||
+        datedesde ||
+        datehasta
+      ) {
+        query += " WHERE ";
+      }
+      // Dynamically add filter conditions
+      const conditions: string[] = [];
+      if (usuario) {
+        conditions.push(`vlead.user = ?`);
+        queryParams.push(`${usuario}`);
+      }
+      if (estado) {
+        conditions.push(`vlead.status = ?`);
+        queryParams.push(`${estado}`);
+      }
+      if (cod_campaign) {
+        conditions.push(`vlead.last_name LIKE ?`);
+        queryParams.push(`%${cod_campaign}%`);
+      }
+      if (list_id) {
+        conditions.push(`vlead.list_id = ?`);
+        queryParams.push(`${list_id}`);
+      }
+      if (campaign_id) {
+        conditions.push(`vlist.campaign_id = ?`);
+        queryParams.push(`${campaign_id}`);
+      }
+      if (statuses && statuses.length > 0) {
+        conditions.push(
+          `vlead.status IN (${statuses.map((status: string) => `?`).join(",")})`
+        );
+        queryParams.push(...statuses.map((status: any) => `${status.status}`));
+      }
+      if (agentes && agentes.length > 0) {
+        conditions.push(
+          `vlead.user IN (${agentes.map((user: string) => `?`).join(",")})`
+        );
+        queryParams.push(...agentes.map((user: any) => `${user.user}`));
+      }
+      if (nombre) {
+        conditions.push(`vlead.first_name LIKE ?`);
+        queryParams.push(`%${nombre}%`);
+      }
+      if (nombre_participante) {
+        conditions.push(`vlead.address1 LIKE ?`);
+        queryParams.push(`%${nombre_participante}%`);
+      }
+      if (nombre_curso) {
+        conditions.push(`vlead.address3 LIKE ?`);
+        queryParams.push(`%${nombre_curso}%`);
+      }
+      if (departamento) {
+        conditions.push(`vlead.city LIKE ?`);
+        queryParams.push(`%${departamento}%`);
+      }
+      if (profesion) {
+        conditions.push(`vlead.province LIKE ?`);
+        queryParams.push(`%${profesion}%`);
+      }
+      if (phone_number) {
+        conditions.push(`vlead.phone_number LIKE ?`);
+        queryParams.push(`%${phone_number}%`);
+      }
+      if (email) {
+        conditions.push(`vlead.email LIKE ?`);
+        queryParams.push(`%${email}%`);
+      }
+      if (comments) {
+        conditions.push(`vlead.comments LIKE ?`);
+        queryParams.push(`%${comments}%`);
+      }
+      if (datedesde) {
+        conditions.push(`vlead.entry_date >= ?`);
+        queryParams.push(datedesde);
+      }
+      if (datehasta) {
+        conditions.push(`vlead.entry_date <= ?`);
+        queryParams.push(datehasta);
+      }
+      // Append conditions to query if any exist
+      if (conditions.length > 0) {
+        query += ` ${conditions.join(" AND ")}`;
+      }
+      query += `;`;
+      console.log(query, queryParams);
+      const [rows] = await db.query(query, queryParams);
+      /*
+      vlead.last_name,
+      vlead.first_name,
+      vlead.address1,
+      vlead.address3,
+      vlead.city,
+      vlead.province,
+      vlead.phone_number,
+      vlead.alt_phone,
+      vlead.email,
+      vlead.comments,
+      vlead.postal_code,
+      vlead.status AS status_code,
+      COALESCE(vstatus_camp.status_name, vstatus_sys.status_name, vlead.status) AS status_display
+      */
+     console.log('lista name:',(new_list_name as any[]).length != 0);
+     const newlista = (new_list_name as any[]).length != 0 ? (new_list_name as any[])[0].list_name : null;
+     const listanombre = (list_name as any[]).length != 0 ? (list_name as any[])[0].list_name : null;
+     console.log(newlista);
+      const [result_insert_reasignaciones] = await dbmalcriada.query(
+        `INSERT INTO vicidial_reasignaciones (origen_list_id, origen_list_name, destino_list_id, destino_list_name, metodo, cantidad, fecha, proceso, activacion_curso, activacion_promocion, activacion_medio) 
+        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
+        [
+          list_id ?? null,
+          listanombre,
+          new_list_id != '' ? new_list_id : null,
+          newlista,
+          metodo,
+          (rows as any[]).length,
+          new Date(),
+          proceso,
+          activacion_curso,
+          activacion_promocion,
+          activacion_medio,
+        ]);
+      for (const row of rows as any[]) {
+        await db.query(`INSERT INTO vicidial_list (
+        last_name,
+        first_name,
+        address1,
+        address3,
+        city,
+        province,
+        phone_number,
+        alt_phone,
+        email,
+        postal_code,
+        list_id,
+        status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          row.last_name,
+          row.first_name,
+          row.address1,
+          row.address3,
+          row.city,
+          row.province,
+          row.phone_number,
+          row.alt_phone,
+          row.email,
+          row.postal_code,
+          new_list_id,
+          'NEW'
+        ]);
+        if(metodo === 'elimina'){
+          await db.query('DELETE FROM vicidial_list WHERE lead_id = ?', [row.lead_id]);
+        }
+        await dbmalcriada.query(`INSERT INTO vicidial_reasignacion (reasignaciones_id, lead_id, last_name, first_name, address1, address3, city, province, phone_number, alt_phone, email, postal_code, status, comments) 
+          values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
+          [
+            (result_insert_reasignaciones as any).insertId,
+            row.lead_id,
+            row.last_name,
+            row.first_name,
+            row.address1,
+            row.address3,
+            row.city,
+            row.province,
+            row.phone_number,
+            row.alt_phone,
+            row.email,
+            row.postal_code,
+            row.status,
+            row.comments
+          ]);
+      }
+      //enviar a nueva 
+      if(active_new_reasignacion){
+        await db.query(`UPDATE vicidial_lists SET active = ? WHERE list_id = ?`, [active_new_reasignacion, new_list_id]);
+      }
+      
+      
+      res.json({
+        results: rows,
+      });
+    } catch (error) {
+      console.error("Error al reasignar el registro:", error);
+      res.status(500).json({ error: "Error interno al reasignar el registro" });
+    }
+  };
 }
