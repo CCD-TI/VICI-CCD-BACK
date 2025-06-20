@@ -19,7 +19,7 @@ RUN chmod +x ./node_modules/.bin/tsc
 COPY . .
 
 # Compilar TypeScript
-RUN npm run build
+RUN npx tsc
 
 # Comando por defecto para correr la app
 CMD ["npm", "run", "start"]
