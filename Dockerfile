@@ -13,6 +13,8 @@ RUN npm install
 # 🔧 Asegurarse de que tsc tenga permisos de ejecución
 #RUN chmod +x ./node_modules/.bin/tsc
 
+RUN chmod +x ./node_modules/.bin/tsc
+
 # Copiar el resto del código
 COPY . .
 
