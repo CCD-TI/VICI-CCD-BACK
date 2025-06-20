@@ -64,6 +64,8 @@ export class HistorialController {
         postal_code
       */
       let query = `SELECT 
+        vlist.list_id,
+        vlead.lead_id,
         vcampaign.campaign_name,
         vlist.list_name,
         vlead.last_name,
@@ -238,14 +240,14 @@ export class HistorialController {
         query += ` ${conditions.join(" AND ")}`;
         countQuery += ` ${conditions.join(" AND ")}`;
       }
-      console.log('FECHAS', datedesde, datehasta);
+      //console.log('FECHAS', datedesde, datehasta);
       
       
       // Add pagination to main query
       query += ` ORDER BY status_code DESC LIMIT ? OFFSET ?`;
       queryParams.push(limit, offset);
-      console.log(query, queryParams);
-      console.log(countQuery, countParams);
+      //console.log(query, queryParams);
+      //console.log(countQuery, countParams);
       // Execute both queries
       const [rows] = await db.query(query, queryParams);
       const [countResult] = await db.query(countQuery, countParams);
@@ -265,6 +267,7 @@ export class HistorialController {
   };
   getResumenByUser = async (req: any, res: any) => {
     const { user } = req.query;
+    console.log(user);
     try {
       let query = `SELECT status, COUNT(*) AS cantidad
             FROM vicidial_list`;
@@ -275,7 +278,7 @@ export class HistorialController {
         params.push(user);
       }
       query += ` GROUP BY status ORDER BY cantidad DESC;`;
-      console.log(query, params);
+      //console.log(query, params);
       const [rows] = await db.query<any[]>(query, params);
       const resumen = rows.map((res: any) => ({
         id: res.status,
@@ -673,7 +676,7 @@ export class HistorialController {
         query += ` ${conditions.join(" AND ")}`;
       }
       query += `;`;
-      console.log(query, queryParams);
+      //console.log(query, queryParams);
       const [rows] = await db.query(query, queryParams);
       /*
       vlead.last_name,
@@ -690,10 +693,10 @@ export class HistorialController {
       vlead.status AS status_code,
       COALESCE(vstatus_camp.status_name, vstatus_sys.status_name, vlead.status) AS status_display
       */
-     console.log('lista name:',(new_list_name as any[]).length != 0);
+     //console.log('lista name:',(new_list_name as any[]).length != 0);
      const newlista = (new_list_name as any[]).length != 0 ? (new_list_name as any[])[0].list_name : null;
      const listanombre = (list_name as any[]).length != 0 ? (list_name as any[])[0].list_name : null;
-     console.log(newlista);
+     //console.log(newlista);
       const [result_insert_reasignaciones] = await dbmalcriada.query(
         `INSERT INTO vicidial_reasignaciones (origen_list_id, origen_list_name, destino_list_id, destino_list_name, metodo, cantidad, fecha, proceso, activacion_curso, activacion_promocion, activacion_medio) 
         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
@@ -773,6 +776,36 @@ export class HistorialController {
     } catch (error) {
       console.error("Error al reasignar el registro:", error);
       res.status(500).json({ error: "Error interno al reasignar el registro" });
+    }
+  };
+  changeStatusByList = async (req: any, res: any) => {
+    try {
+      const { lead_id, status } = req.body;
+      const [result] = await db.query(
+        `UPDATE vicidial_list SET status = ? WHERE lead_id = ?`,
+        [status, lead_id]
+      );
+      res.json({
+        result,
+      });
+    } catch (error) {
+      console.error("Error al cambiar el estado de la lista:", error);
+      res.status(500).json({ error: "Error interno al cambiar el estado de la lista" });
+    }
+  };
+  changeCommentByList = async (req: any, res: any) => {
+    try {
+      const { lead_id, comments } = req.body;
+      const [result] = await db.query(
+        `UPDATE vicidial_list SET comments = ? WHERE lead_id = ?`,
+        [comments, lead_id]
+      );
+      res.json({
+        result,
+      });
+    } catch (error) {
+      console.error("Error al cambiar el comentario de la lista:", error);
+      res.status(500).json({ error: "Error interno al cambiar el comentario de la lista" });
     }
   };
 }
