@@ -5,7 +5,7 @@ class DatabMalcriada {
 
   private constructor() {
     this.pool = mysql.createPool({
-        host: process.env.DB_HOST || 'host.docker.internal',
+        host: process.env.DB_HOST || '192.168.1.182',
         user: process.env.DB_USER || 'paul',
         password: process.env.DB_PASSWORD || 'paulp',
         database: process.env.DB_NAME || 'vicidial',
