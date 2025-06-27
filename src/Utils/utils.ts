@@ -1,4 +1,4 @@
-const tipificacionesMap: Record<string, string> = {
+export const tipificacionesMap: Record<string, string> = {
     "1101": "MATRICULADO",
     "1102": "PAGO INCOMPLETO",
     "1202": "MUY INTERESADO",

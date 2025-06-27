@@ -1,5 +1,6 @@
 import { db } from "../../config/db";
 import { dbmalcriada } from "../../config/dbmalcriada";
+import { tipificacionesMap } from "../../Utils/utils";
 
 export class HistorialController {
   getAllByUser = async (req: any, res: any) => {
@@ -226,12 +227,12 @@ export class HistorialController {
         countParams.push(`%${modify_date}%`);
       }
       if (datedesde) {
-        conditions.push(`vlead.entry_date >= ?`);
+        conditions.push(`vlead.modify_date >= ?`);
         queryParams.push(datedesde);
         countParams.push(datedesde);
       }
       if (datehasta) {
-        conditions.push(`vlead.entry_date <= ?`);
+        conditions.push(`vlead.modify_date <= ?`);
         queryParams.push(datehasta);
         countParams.push(datehasta);
       }
@@ -291,6 +292,151 @@ export class HistorialController {
       res.status(500).json({ error: "Error al obtener leads" });
     }
   };
+  getResumenByUserFiltrado = async (req: any, res: any) => {
+    const {
+      estado,
+      cod_campaign,
+      usuario,
+      dni,
+      nombre_participante,
+      nombre_curso,
+      departamento,
+      profesion,
+      phone_number,
+      email,
+      campaign,
+      nombre,
+      comments,
+      fecha,
+      list_id,
+      campaign_id,
+      statuses,
+      agentes,
+      datedesde,
+      datehasta,
+      entry_date,
+      modify_date,
+    } = req.body;
+  
+    try {
+      let query = `SELECT vlead.status, COUNT(*) AS cantidad
+      FROM vicidial_list AS vlead
+      INNER JOIN vicidial_lists AS vlist ON vlead.list_id = vlist.list_id
+      INNER JOIN vicidial_campaigns AS vcampaign ON vcampaign.campaign_id = vlist.campaign_id
+      LEFT JOIN vicidial_users AS vuser ON vuser.user = vlead.user`;
+  
+      const conditions: string[] = [];
+      const params: any[] = [];
+  
+      if (usuario) {
+        conditions.push(`vlead.user = ?`);
+        params.push(`${usuario}`);
+      }
+      if (estado) {
+        conditions.push(`vlead.status = ?`);
+        params.push(`${estado}`);
+      }
+      if (cod_campaign) {
+        conditions.push(`vlead.last_name LIKE ?`);
+        params.push(`%${cod_campaign}%`);
+      }
+      if (list_id) {
+        conditions.push(`vlead.list_id = ?`);
+        params.push(`${list_id}`);
+      }
+      if (campaign_id) {
+        conditions.push(`vlist.campaign_id = ?`);
+        params.push(`${campaign_id}`);
+      }
+      if (statuses && statuses.length > 0) {
+        conditions.push(
+          `vlead.status IN (${statuses.map(() => `?`).join(",")})`
+        );
+        params.push(...statuses.map((s: any) => `${s.status}`));
+      }
+      if (agentes && agentes.length > 0) {
+        conditions.push(
+          `vlead.user IN (${agentes.map(() => `?`).join(",")})`
+        );
+        params.push(...agentes.map((u: any) => `${u.user}`));
+      }
+      if (nombre) {
+        conditions.push(`vlead.first_name LIKE ?`);
+        params.push(`%${nombre}%`);
+      }
+      if (nombre_participante) {
+        conditions.push(`vlead.address1 LIKE ?`);
+        params.push(`%${nombre_participante}%`);
+      }
+      if (nombre_curso) {
+        conditions.push(`vlead.address3 LIKE ?`);
+        params.push(`%${nombre_curso}%`);
+      }
+      if (departamento) {
+        conditions.push(`vlead.city LIKE ?`);
+        params.push(`%${departamento}%`);
+      }
+      if (profesion) {
+        conditions.push(`vlead.province LIKE ?`);
+        params.push(`%${profesion}%`);
+      }
+      if (phone_number) {
+        conditions.push(`vlead.phone_number LIKE ?`);
+        params.push(`%${phone_number}%`);
+      }
+      if (email) {
+        conditions.push(`vlead.email LIKE ?`);
+        params.push(`%${email}%`);
+      }
+      if (comments) {
+        conditions.push(`vlead.comments LIKE ?`);
+        params.push(`%${comments}%`);
+      }
+      if (entry_date) {
+        conditions.push(`vlead.entry_date LIKE ?`);
+        params.push(`%${entry_date}%`);
+      }
+      if (modify_date) {
+        conditions.push(`vlead.modify_date LIKE ?`);
+        params.push(`%${modify_date}%`);
+      }
+      if (datedesde) {
+        conditions.push(`vlead.entry_date >= ?`);
+        params.push(datedesde);
+      }
+      if (datehasta) {
+        conditions.push(`vlead.entry_date <= ?`);
+        params.push(datehasta);
+      }
+  
+      if (conditions.length > 0) {
+        query += ` WHERE ${conditions.join(" AND ")}`;
+      }
+  
+      query += ` GROUP BY vlead.status ORDER BY cantidad DESC`;
+  
+      const [rows] = await db.query<any[]>(query, params);
+  
+      // Crear un map con los resultados reales
+      const resultMap = new Map<string, number>();
+      for (const row of rows) {
+        resultMap.set(row.status, row.cantidad);
+      }
+  
+      // Completar los faltantes con 0
+      const resumen = Object.entries(tipificacionesMap).map(([status, label]) => ({
+        id: status,
+        cantidad: resultMap.get(status) || 0,
+        statusname: label,
+      }));
+  
+      res.json(resumen);
+    } catch (error) {
+      console.error("Error al obtener resumen:", error);
+      res.status(500).json({ error: "Error al obtener resumen" });
+    }
+  };
+  
   private significado = (id: string): { icon: string; statusname: string } => {
     /*
       1101	MATRICULADO
